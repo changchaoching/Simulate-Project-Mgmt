@@ -1,4 +1,4 @@
-四大核心決策項目 (Decision Variables)
+專案管理四大核心決策項目 (Decision Variables) ：品質、時間、數量（範疇）、成本（人手）
 
 目標團隊人數（Planned Headcount）：
 
