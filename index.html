@@ -1,0 +1,439 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>專案管理飛行模擬器 | Project Management Flight Simulator (MIT Sloan SD)</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Chart.js CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "PingFang TC", "Microsoft JhengHei", sans-serif;
+      background-color: #f8fafc;
+    }
+  </style>
+</head>
+<body class="text-slate-800 antialiased min-h-screen flex flex-col">
+
+  <!-- 頂部導航列 (Navbar) -->
+  <header class="bg-indigo-950 text-white shadow-md sticky top-0 z-30 border-b border-indigo-900">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3.5 flex flex-wrap justify-between items-center gap-3">
+      <div class="flex items-center space-x-3">
+        <div class="bg-indigo-600 p-2 rounded-lg text-white shadow-inner">
+          <i class="fa-solid fa-diagram-project text-xl"></i>
+        </div>
+        <div>
+          <div class="flex items-center gap-2">
+            <h1 class="text-lg font-bold tracking-tight">專案管理飛行模擬器</h1>
+            <span class="text-xs bg-indigo-800 text-indigo-200 px-2 py-0.5 rounded-full font-mono">MIT Sloan SD</span>
+          </div>
+          <p class="text-xs text-indigo-300">Sterman, Gozluklu & Repenning 系統動力學專案動態決策模型</p>
+        </div>
+      </div>
+
+      <!-- 右側動作按鈕 -->
+      <div class="flex items-center flex-wrap gap-2">
+        <span id="currentWeekBadge" class="bg-indigo-900/80 border border-indigo-700/60 px-3 py-1 rounded-lg text-xs font-mono font-bold text-amber-300">
+          第 1 / 50 週
+        </span>
+        <span id="projectStatusBadge" class="px-2.5 py-1 rounded-full text-xs font-semibold bg-blue-100 text-blue-800">
+          進行中 (In Progress)
+        </span>
+        <button id="openCausalModalBtn" class="bg-indigo-800 hover:bg-indigo-700 text-indigo-100 text-xs px-3 py-1.5 rounded-lg border border-indigo-600 transition flex items-center gap-1.5">
+          <i class="fa-solid fa-circle-nodes"></i> 因果迴路解析
+        </button>
+        <button id="openSubmitModalBtn" class="bg-emerald-600 hover:bg-emerald-500 text-white text-xs px-3.5 py-1.5 rounded-lg font-semibold shadow transition flex items-center gap-1.5">
+          <i class="fa-solid fa-cloud-arrow-up"></i> 登錄成績至 Google 試算表
+        </button>
+        <button id="exportCsvBtn" class="bg-slate-700 hover:bg-slate-600 text-white text-xs px-2.5 py-1.5 rounded-lg transition" title="匯出 CSV">
+          <i class="fa-solid fa-file-csv"></i>
+        </button>
+        <button id="resetBtn" class="bg-rose-700/80 hover:bg-rose-600 text-white text-xs px-2.5 py-1.5 rounded-lg transition" title="重新開始">
+          <i class="fa-solid fa-rotate-left"></i>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- 主要內容區 -->
+  <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5 flex-1 w-full space-y-5">
+
+    <!-- KPI 關鍵營運指標卡片 -->
+    <section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3.5">
+      <!-- KPI 1: 時程進度 (Schedule Variance) -->
+      <div class="bg-white p-3.5 rounded-xl border border-slate-200 shadow-sm">
+        <div class="flex items-center justify-between text-slate-500 text-xs mb-1">
+          <span>時程指標 (預計W40完工)</span>
+          <i class="fa-regular fa-clock text-indigo-500"></i>
+        </div>
+        <div id="kpiScheduleVariance" class="text-xl font-bold text-slate-800">尚餘 39 週</div>
+        <div class="mt-2 w-full bg-slate-100 rounded-full h-2 overflow-hidden">
+          <div id="kpiProgressBar" class="bg-indigo-600 h-2 rounded-full transition-all duration-300" style="width: 0%"></div>
+        </div>
+        <div class="flex justify-between text-[10px] text-slate-400 mt-1">
+          <span>表觀進度</span>
+          <span id="kpiProgressText" class="font-bold text-slate-600">0%</span>
+        </div>
+      </div>
+
+      <!-- KPI 2: 預算與成本 (Cost Variance) -->
+      <div class="bg-white p-3.5 rounded-xl border border-slate-200 shadow-sm">
+        <div class="flex items-center justify-between text-slate-500 text-xs mb-1">
+          <span>預算結餘 (總額 $2,500k)</span>
+          <i class="fa-solid fa-coins text-amber-500"></i>
+        </div>
+        <div id="kpiCostVariance" class="text-xl font-bold text-emerald-600">+$2,500 k</div>
+        <div class="text-[11px] text-slate-500 mt-2 flex justify-between">
+          <span>每週基礎時薪: $50/h</span>
+          <span class="text-slate-400">加班 1.5x</span>
+        </div>
+      </div>
+
+      <!-- KPI 3: 任務範疇 (Pending Scope) -->
+      <div class="bg-white p-3.5 rounded-xl border border-slate-200 shadow-sm">
+        <div class="flex items-center justify-between text-slate-500 text-xs mb-1">
+          <span>待辦任務 (Tasks Remaining)</span>
+          <i class="fa-solid fa-list-check text-blue-500"></i>
+        </div>
+        <div id="kpiTasksRemaining" class="text-xl font-bold text-slate-800">1000 / 1000</div>
+        <div class="text-[11px] text-slate-500 mt-2">
+          <span>基準產能: ~1.4 點數/人/週</span>
+        </div>
+      </div>
+
+      <!-- KPI 4: 隱藏技術債與返工 (Undiscovered Rework) -->
+      <div class="bg-white p-3.5 rounded-xl border border-slate-200 shadow-sm">
+        <div class="flex items-center justify-between text-slate-500 text-xs mb-1">
+          <span>未發現返工 (潛在缺陷)</span>
+          <i class="fa-solid fa-triangle-exclamation text-rose-500"></i>
+        </div>
+        <div id="kpiUndiscoveredRework" class="text-xl font-bold text-slate-700">0 項 (已浮現: 0)</div>
+        <div class="text-[11px] text-slate-400 mt-2">
+          <span>90% 完成症候群之核心根源</span>
+        </div>
+      </div>
+
+      <!-- KPI 5: 團隊心理與狀態 (Morale & Fatigue) -->
+      <div class="bg-white p-3.5 rounded-xl border border-slate-200 shadow-sm">
+        <div class="flex items-center justify-between text-slate-500 text-xs mb-1">
+          <span>團隊身心狀態 (士氣/疲勞)</span>
+          <i class="fa-solid fa-heart-pulse text-emerald-500"></i>
+        </div>
+        <div id="kpiMoraleFatigue" class="text-base font-bold text-slate-800">士氣 100分 / 疲勞 1.0x</div>
+        <div class="text-[11px] text-slate-500 mt-2 flex justify-between">
+          <span>過度加班將誘發品質崩解</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- 決策控制駕駛艙 & 情境模式 -->
+    <section class="bg-white rounded-xl border border-slate-200 shadow-sm p-4 sm:p-5">
+      <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 border-b border-slate-100 pb-3 mb-4">
+        <div>
+          <h2 class="text-base font-bold text-slate-800 flex items-center gap-2">
+            <i class="fa-solid fa-sliders text-indigo-600"></i> 每週專案經理決策控制室 (Decision Cockpit)
+          </h2>
+          <p class="text-xs text-slate-500">調整團隊編制、週工作時數與品管策略，引導專案突破時程與品質取捨困境</p>
+        </div>
+
+        <!-- 典型決策情境預設 -->
+        <div class="flex flex-wrap items-center gap-1.5 text-xs">
+          <span class="text-slate-400 mr-1 font-medium text-[11px]">情境策略:</span>
+          <button id="presetBalanced" class="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-md font-medium transition">
+            穩健標準 (40h/高品管)
+          </button>
+          <button id="presetCrunch" class="px-2.5 py-1 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 rounded-md font-medium transition">
+            趕工壓榨 (58h/低品管)
+          </button>
+          <button id="presetBrooks" class="px-2.5 py-1 bg-rose-50 hover:bg-rose-100 text-rose-800 border border-rose-200 rounded-md font-medium transition">
+            布魯克斯陷阱 (擴招42人)
+          </button>
+          <button id="presetQuality" class="px-2.5 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 rounded-md font-medium transition">
+            嚴格品管與範疇凍結
+          </button>
+        </div>
+      </div>
+
+      <!-- 決策滑桿與開關 -->
+      <div class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-5">
+        <!-- 決策 1: 目標團隊人數 (Planned Headcount) -->
+        <div class="space-y-1.5">
+          <div class="flex justify-between items-center text-xs">
+            <label class="font-semibold text-slate-700 flex items-center gap-1">
+              <i class="fa-solid fa-users text-blue-500"></i> 目標團隊人數 (Headcount)
+            </label>
+            <span id="valHeadcount" class="font-mono font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded text-xs">22 人</span>
+          </div>
+          <input id="sliderHeadcount" type="range" min="10" max="42" step="1" value="22" class="w-full accent-blue-600 cursor-pointer">
+          <p class="text-[11px] text-slate-400">新人引進需 2 週，且資深員工需負擔 20% 導師時間。</p>
+        </div>
+
+        <!-- 決策 2: 排定工時 (Scheduled Hours) -->
+        <div class="space-y-1.5">
+          <div class="flex justify-between items-center text-xs">
+            <label class="font-semibold text-slate-700 flex items-center gap-1">
+              <i class="fa-solid fa-business-time text-amber-500"></i> 排定週工時 (Scheduled Hours)
+            </label>
+            <span id="valWorkHours" class="font-mono font-bold text-amber-600 bg-amber-50 px-2 py-0.5 rounded text-xs">40 小時/週</span>
+          </div>
+          <input id="sliderWorkHours" type="range" min="35" max="65" step="1" value="40" class="w-full accent-amber-500 cursor-pointer">
+          <p class="text-[11px] text-slate-400">>40 小時支付 1.5x 加班費，並加速累積疲勞與缺陷率。</p>
+        </div>
+
+        <!-- 決策 3: 品管測試強度 (QA Intensity) -->
+        <div class="space-y-1.5">
+          <div class="flex justify-between items-center text-xs">
+            <label class="font-semibold text-slate-700 flex items-center gap-1">
+              <i class="fa-solid fa-vial-circle-check text-emerald-500"></i> 測試與品管強度 (QA Rate)
+            </label>
+            <span id="valQaIntensity" class="font-mono font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded text-xs">80 %</span>
+          </div>
+          <input id="sliderQaIntensity" type="range" min="0.2" max="1.0" step="0.05" value="0.80" class="w-full accent-emerald-500 cursor-pointer">
+          <p class="text-[11px] text-slate-400">強度越低表觀推進越快，但隱蔽未發現返工將在後期爆發。</p>
+        </div>
+
+        <!-- 決策 4: 範疇變更政策 & 推進按鈕 -->
+        <div class="flex flex-col justify-between space-y-2">
+          <div>
+            <label class="text-xs font-semibold text-slate-700 block mb-1">
+              <i class="fa-solid fa-handshake-angle text-purple-500"></i> 客戶範疇變更協議 (Scope Control)
+            </label>
+            <label class="inline-flex items-center cursor-pointer text-xs">
+              <input id="checkScopeAcceptance" type="checkbox" checked class="sr-only peer">
+              <div class="relative w-9 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-purple-600"></div>
+              <span class="ms-2 font-medium text-slate-600 text-xs">接受客戶追加需求 (未凍結)</span>
+            </label>
+            <div id="scopeNoticeBox" class="hidden text-[10px] text-purple-700 bg-purple-50 p-1 rounded mt-1">
+              ⚠️ 本週客戶提出重大規格變更要求！
+            </div>
+          </div>
+
+          <!-- 推進按鈕 -->
+          <div class="flex gap-2 pt-1">
+            <button id="stepOneWeekBtn" class="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2 px-3 rounded-lg text-xs shadow-sm transition flex items-center justify-center gap-1.5">
+              <i class="fa-solid fa-forward-step"></i> 推進 1 週
+            </button>
+            <button id="stepFourWeeksBtn" class="bg-indigo-100 hover:bg-indigo-200 text-indigo-800 font-semibold py-2 px-3 rounded-lg text-xs transition flex items-center justify-center gap-1">
+              <i class="fa-solid fa-forward-fast"></i> 推進 4 週
+            </button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 系統動力學即時圖表區 (4 大核心視圖) -->
+    <section class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      <!-- 圖 1: 工作進度與返工循環 -->
+      <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+        <div class="flex justify-between items-center mb-2">
+          <h3 class="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+            <i class="fa-solid fa-arrows-spin text-rose-500"></i> 工作範疇與返工循環 (The Rework Cycle)
+          </h3>
+          <span class="text-[10px] text-slate-400">觀察未發現返工與 90% 症候群</span>
+        </div>
+        <div class="h-64">
+          <canvas id="chartProgress"></canvas>
+        </div>
+      </div>
+
+      <!-- 圖 2: 人力資源與加班工時 -->
+      <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+        <div class="flex justify-between items-center mb-2">
+          <h3 class="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+            <i class="fa-solid fa-people-arrows text-blue-500"></i> 人力配置與加班工時 (Brooks' Law)
+          </h3>
+          <span class="text-[10px] text-slate-400">資深/新人工程師比例與工時</span>
+        </div>
+        <div class="h-64">
+          <canvas id="chartWorkforce"></canvas>
+        </div>
+      </div>
+
+      <!-- 圖 3: 累計成本與預算上限 -->
+      <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+        <div class="flex justify-between items-center mb-2">
+          <h3 class="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+            <i class="fa-solid fa-money-bill-trend-up text-purple-500"></i> 累計成本曲線 vs. 預算上限 ($2,500k)
+          </h3>
+          <span class="text-[10px] text-slate-400">加班與招募導致成本非線性膨脹</span>
+        </div>
+        <div class="h-64">
+          <canvas id="chartCost"></canvas>
+        </div>
+      </div>
+
+      <!-- 圖 4: 疲勞、士氣與錯誤率 -->
+      <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+        <div class="flex justify-between items-center mb-2">
+          <h3 class="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+            <i class="fa-solid fa-brain text-emerald-500"></i> 疲勞指數、團隊士氣與錯誤產生率
+          </h3>
+          <span class="text-[10px] text-slate-400">心理動態對軟體品質的非線性衝擊</span>
+        </div>
+        <div class="h-64">
+          <canvas id="chartQuality"></canvas>
+        </div>
+      </div>
+    </section>
+
+    <!-- 每週專案進度與成本營運日誌表格 (Historical Log) -->
+    <section class="bg-white rounded-xl border border-slate-200 shadow-sm p-4">
+      <div class="flex justify-between items-center mb-3">
+        <div>
+          <h3 class="text-sm font-bold text-slate-800 flex items-center gap-1.5">
+            <i class="fa-solid fa-table-list text-indigo-600"></i> 每週專案營運明細紀錄 (Weekly Historical Log)
+          </h3>
+          <p class="text-xs text-slate-500">完整記錄每週狀態變數與決策變數，將同步整批登錄至 Google 試算表工作表 2</p>
+        </div>
+        <span class="text-xs text-slate-400 font-mono">50-Week Cycle</span>
+      </div>
+
+      <div class="overflow-x-auto max-h-72 border border-slate-100 rounded-lg">
+        <table class="w-full text-left border-collapse">
+          <thead class="bg-slate-50 text-[11px] font-semibold text-slate-600 sticky top-0 shadow-sm">
+            <tr>
+              <th class="py-2.5 px-3">週次</th>
+              <th class="py-2.5 px-3">團隊編制</th>
+              <th class="py-2.5 px-3">排定工時</th>
+              <th class="py-2.5 px-3">品管強度</th>
+              <th class="py-2.5 px-3">待辦任務</th>
+              <th class="py-2.5 px-3">表觀完成</th>
+              <th class="py-2.5 px-3 text-rose-600">未發現返工</th>
+              <th class="py-2.5 px-3">已發現返工</th>
+              <th class="py-2.5 px-3 text-emerald-600">無瑕疵完工</th>
+              <th class="py-2.5 px-3">士氣</th>
+              <th class="py-2.5 px-3">錯誤率</th>
+              <th class="py-2.5 px-3">累計成本</th>
+              <th class="py-2.5 px-3">進度率</th>
+            </tr>
+          </thead>
+          <tbody id="logTableBody" class="divide-y divide-slate-100 text-xs text-slate-600 font-mono">
+            <!-- 由 app.js 動態渲染 -->
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- 頁尾 -->
+  <footer class="bg-white border-t border-slate-200 py-4 mt-6 text-center text-xs text-slate-500">
+    <div class="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row justify-between items-center gap-2">
+      <p>© MIT Sloan School of Management - System Dynamics Group. Adapted for Interactive Teaching Dashboard.</p>
+      <p class="text-slate-400">Single Spreadsheet, Two-Sheet Architecture with Google Apps Script Webhook</p>
+    </div>
+  </footer>
+
+  <!-- 模態視窗 1: 因果迴路圖與教學說明 (Causal Loop Explanation) -->
+  <div id="causalModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-white rounded-2xl max-w-3xl w-full max-h-[90vh] overflow-y-auto shadow-2xl border border-slate-200 p-6 space-y-4">
+      <div class="flex justify-between items-center border-b border-slate-100 pb-3">
+        <h3 class="text-base font-bold text-slate-800 flex items-center gap-2">
+          <i class="fa-solid fa-circle-nodes text-indigo-600"></i> MIT Sloan 專案管理系統動力學四大核心反饋迴路
+        </h3>
+        <button id="closeCausalModalBtn" class="text-slate-400 hover:text-slate-600 text-lg">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <div class="space-y-4 text-xs text-slate-600 leading-relaxed">
+        <div class="p-3.5 bg-rose-50 border border-rose-200 rounded-xl">
+          <h4 class="font-bold text-rose-800 text-sm mb-1">1. 返工循環 (The Rework Cycle) 與「90% 完成症候群」</h4>
+          <p>在許多複雜產品研發或軟體開發專案中，表觀進度看似快速抵達 90%，但隨後專案進度卻長時間停滯不前。原因是前期在高壓或不足的測試下，大量帶有缺陷的任務被誤認為「已完成」，隱藏在「未發現返工」庫存中。當專案進入整合測試時，缺陷全面浮現，迫使工程師重做，導致進度嚴重倒退。</p>
+        </div>
+
+        <div class="p-3.5 bg-blue-50 border border-blue-200 rounded-xl">
+          <h4 class="font-bold text-blue-800 text-sm mb-1">2. 布魯克斯法則 (Brooks' Law) 的反饋延遲機制</h4>
+          <p>「向進度落後的軟體專案增加人手只會使專案更加落後。」當專案經理大幅招募新人時，存在 2 週招聘入職延遲，且資深員工每指導一名新人必須分擔 20% 工時；短期內團隊的「淨有效產能」不但沒有增加，反而因溝通成本與輔導負擔大幅下滑！</p>
+        </div>
+
+        <div class="p-3.5 bg-amber-50 border border-amber-200 rounded-xl">
+          <h4 class="font-bold text-amber-800 text-sm mb-1">3. 時程壓力、過勞與偷工減料 (Schedule Pressure & Corner-Cutting)</h4>
+          <p>面對交付截止日，管理者常祭出高時數加班策略。加班在第 1~2 週能提供短期產能峰值，但長期 (>40h) 會導致工程師嚴重疲勞與士氣低落。疲勞使得錯誤產生率由 10% 飆升至 40% 以上，並迫使團隊偷工減料 (跳過 QA 審查)，最終埋下巨額返工未爆彈。</p>
+        </div>
+
+        <div class="p-3.5 bg-purple-50 border border-purple-200 rounded-xl">
+          <h4 class="font-bold text-purple-800 text-sm mb-1">4. 範疇蔓延與變更控制 (Scope Creep & Change Control)</h4>
+          <p>在研發週期中，客戶與利益關係人常不斷追加需求。若未嚴格執行變更凍結控制 (Scope Freezing)，將使專案基準任務不斷膨脹，引發無止境的工期蔓延與預算超支。</p>
+        </div>
+      </div>
+
+      <div class="text-right pt-2 border-t border-slate-100">
+        <button onclick="document.getElementById('causalModal').classList.add('hidden')" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-lg text-xs">
+          我瞭解了，返回模擬
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 模態視窗 2: 登錄專案成績至 Google 試算表 (Two-Sheet Submit Modal) -->
+  <div id="submitModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-white rounded-2xl max-w-lg w-full shadow-2xl border border-slate-200 p-6 space-y-4">
+      <div class="flex justify-between items-center border-b border-slate-100 pb-3">
+        <div>
+          <h3 class="text-base font-bold text-slate-800 flex items-center gap-2">
+            <i class="fa-solid fa-cloud-arrow-up text-emerald-600"></i> 登錄成績至 Google 試算表
+          </h3>
+          <p class="text-xs text-slate-500">採用單一試算表、雙工作表 (Two-Sheet) 架構批次寫入</p>
+        </div>
+        <button id="closeSubmitModalBtn" class="text-slate-400 hover:text-slate-600 text-lg">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <form id="submitForm" class="space-y-3.5">
+        <div>
+          <label class="block text-xs font-semibold text-slate-700 mb-1">Google Apps Script Web App URL <span class="text-rose-500">*</span></label>
+          <input id="inputGasUrl" type="url" required placeholder="https://script.google.com/macros/s/.../exec" class="w-full text-xs px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:outline-none font-mono">
+          <p class="text-[10px] text-slate-400 mt-0.5">請輸入授課教師部署之 GAS 網路應用程式網址</p>
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">班級 / 組別</label>
+            <input id="inputClassName" type="text" placeholder="例如：專案管理甲班" class="w-full text-xs px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">學號 <span class="text-rose-500">*</span></label>
+            <input id="inputStudentId" type="text" required placeholder="例如：B1107001" class="w-full text-xs px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-700 mb-1">學生姓名 <span class="text-rose-500">*</span></label>
+          <input id="inputStudentName" type="text" required placeholder="例如：王小明" class="w-full text-xs px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-700 mb-1">專案檢討報告或筆記連結 (選填)</label>
+          <input id="inputReportUrl" type="url" placeholder="https://docs.google.com/..." class="w-full text-xs px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+        </div>
+
+        <div class="bg-slate-50 border border-slate-200 rounded-lg p-3 text-[11px] text-slate-600 space-y-1">
+          <div class="font-semibold text-slate-700">寫入雙工作表架構說明：</div>
+          <p>• <b>工作表 1 (專案成績與排行榜)</b>：寫入完工週數、總預算支出、時程成本差異與評等。</p>
+          <p>• <b>工作表 2 (每週進度與成本明細)</b>：寫入每週決策參數、人力、疲勞、錯誤率與返工庫存。</p>
+        </div>
+
+        <div id="submitStatusMsg" class="hidden text-xs"></div>
+
+        <div class="flex justify-end gap-2 pt-2 border-t border-slate-100">
+          <button type="button" id="cancelSubmitBtn" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium rounded-lg text-xs transition">
+            取消
+          </button>
+          <button type="submit" id="submitBtn" class="px-5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-semibold rounded-lg text-xs shadow-sm transition">
+            確認送出
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- 引入模組 JS -->
+  <script src="engine.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
